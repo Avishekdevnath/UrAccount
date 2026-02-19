@@ -2,15 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { fetchTrialBalance } from "@/lib/api-client";
 import type { TrialBalanceRow } from "@/lib/api-types";
 import { useCompanyContext } from "@/lib/use-company-context";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableFooter,
+} from "@/components/ui/table";
 
 function toNumber(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function fmt(value: number): string {
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
 export default function TrialBalancePage() {
@@ -22,9 +37,7 @@ export default function TrialBalancePage() {
   const [loadingRows, setLoadingRows] = useState(false);
 
   useEffect(() => {
-    if (!activeCompany) {
-      return;
-    }
+    if (!activeCompany) return;
     const companyId = activeCompany.id;
     async function loadTrialBalance() {
       setLoadingRows(true);
@@ -49,69 +62,94 @@ export default function TrialBalancePage() {
     );
   }, [rows]);
 
+  const isBalanced = Math.abs(totals.debit - totals.credit) < 0.01;
+
   if (isLoading) {
-    return <main className="flex min-h-screen items-center justify-center text-sm text-zinc-600">Loading...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      </main>
+    );
   }
 
   if (error || !user || !activeCompany || !access) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <section className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <section className="w-full max-w-md rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
           <p>{error || "Access context is missing."}</p>
-          <button className="mt-3 text-sm underline" onClick={handleLogout}>
-            Go to login
-          </button>
+          <button className="mt-3 text-sm underline" onClick={handleLogout}>Go to login</button>
         </section>
       </main>
     );
   }
 
   return (
-    <AppShell
-      user={user}
-      companies={companies}
-      activeCompany={activeCompany}
-      access={access}
-      onLogout={handleLogout}
-      onNavigate={handleNavigate}
-    >
-      <div className="rounded-lg border border-zinc-200 p-4">
-        <h2 className="text-lg font-medium text-zinc-900">Trial Balance</h2>
-        <p className="mt-1 text-sm text-zinc-600">Posted ledger totals by account.</p>
+    <AppShell user={user} companies={companies} activeCompany={activeCompany} access={access} onLogout={handleLogout} onNavigate={handleNavigate}>
+      <PageHeader
+        title="Trial Balance"
+        description="Posted ledger totals by account."
+        breadcrumbs={[{ label: "Accounting" }, { label: "Trial Balance" }]}
+        actions={
+          isBalanced && rows.length > 0 ? (
+            <span className="inline-flex items-center rounded px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              Balanced
+            </span>
+          ) : rows.length > 0 ? (
+            <span className="inline-flex items-center rounded px-2.5 py-1 text-xs font-medium bg-red-50 text-red-700 ring-1 ring-inset ring-red-200">
+              Out of Balance
+            </span>
+          ) : null
+        }
+      />
 
-        <div className="mt-4 overflow-x-auto">
-          {loadingRows ? (
-            <p className="text-sm text-zinc-600">Loading trial balance...</p>
-          ) : (
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 text-left text-zinc-600">
-                  <th className="py-2 pr-3">Code</th>
-                  <th className="py-2 pr-3">Account</th>
-                  <th className="py-2 pr-3">Debit</th>
-                  <th className="py-2 pr-3">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.account__id} className="border-b border-zinc-100">
-                    <td className="py-2 pr-3 font-mono">{row.account__code}</td>
-                    <td className="py-2 pr-3">{row.account__name}</td>
-                    <td className="py-2 pr-3">{row.total_debit}</td>
-                    <td className="py-2 pr-3">{row.total_credit}</td>
-                  </tr>
-                ))}
-                <tr className="border-t border-zinc-300 font-semibold">
-                  <td className="py-2 pr-3" colSpan={2}>
-                    Total
-                  </td>
-                  <td className="py-2 pr-3">{totals.debit.toFixed(2)}</td>
-                  <td className="py-2 pr-3">{totals.credit.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="w-24 font-semibold text-xs">Code</TableHead>
+              <TableHead className="font-semibold text-xs">Account</TableHead>
+              <TableHead className="font-semibold text-xs text-right">Debit</TableHead>
+              <TableHead className="font-semibold text-xs text-right">Credit</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loadingRows ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-12 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading trial balance…
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-12 text-center">
+                  <p className="text-sm text-muted-foreground">No posted entries yet.</p>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row) => (
+                <TableRow key={row.account__id}>
+                  <TableCell className="font-mono text-sm text-muted-foreground">{row.account__code}</TableCell>
+                  <TableCell className="text-sm">{row.account__name}</TableCell>
+                  <TableCell className="text-sm text-right tabular-nums">{fmt(toNumber(row.total_debit))}</TableCell>
+                  <TableCell className="text-sm text-right tabular-nums">{fmt(toNumber(row.total_credit))}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+          {rows.length > 0 && (
+            <TableFooter>
+              <TableRow className="font-semibold bg-muted/40">
+                <TableCell colSpan={2} className="text-sm">Total</TableCell>
+                <TableCell className="text-sm text-right tabular-nums">{fmt(totals.debit)}</TableCell>
+                <TableCell className="text-sm text-right tabular-nums">{fmt(totals.credit)}</TableCell>
+              </TableRow>
+            </TableFooter>
           )}
-        </div>
+        </Table>
       </div>
     </AppShell>
   );
