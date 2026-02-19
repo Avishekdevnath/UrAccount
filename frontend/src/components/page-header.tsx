@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +25,18 @@ export function PageHeader({ title, description, breadcrumbs, actions, className
             {breadcrumbs.map((item, index) => (
               <li key={index} className="flex items-center gap-1">
                 {index > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
-                <span className={index === breadcrumbs.length - 1 ? "text-foreground font-medium" : ""}>
-                  {item.label}
-                </span>
+                {item.href && index < breadcrumbs.length - 1 ? (
+                  <Link
+                    href={item.href}
+                    className="transition-colors hover:text-foreground hover:underline underline-offset-4"
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span className={index === breadcrumbs.length - 1 ? "text-foreground font-medium" : ""}>
+                    {item.label}
+                  </span>
+                )}
               </li>
             ))}
           </ol>

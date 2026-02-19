@@ -2,11 +2,38 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Loader2, RefreshCw } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { fetchAccounts, fetchGeneralLedgerReport } from "@/lib/api-client";
 import type { Account, GeneralLedgerReport } from "@/lib/api-types";
 import { useCompanyContext } from "@/lib/use-company-context";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+function fmt(value: string | null | undefined): string {
+  if (!value) return "—";
+  const num = parseFloat(value);
+  if (isNaN(num) || num === 0) return "—";
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+}
 
 export default function GeneralLedgerReportPage() {
   const params = useParams<{ companySlug: string }>();
@@ -43,120 +70,110 @@ export default function GeneralLedgerReportPage() {
   }, [filters]);
 
   useEffect(() => {
-    if (!activeCompany) {
-      return;
-    }
-    const companyId = activeCompany.id;
-    void loadData(companyId);
+    if (!activeCompany) return;
+    void loadData(activeCompany.id);
   }, [activeCompany, loadData]);
 
   async function handleRefresh(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeCompany) {
-      return;
-    }
+    if (!activeCompany) return;
     await loadData(activeCompany.id);
   }
 
   if (isLoading) {
-    return <main className="flex min-h-screen items-center justify-center text-sm text-zinc-600">Loading...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      </main>
+    );
   }
 
   if (error || !user || !activeCompany || !access) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <section className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <section className="w-full max-w-md rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
           <p>{error || "Access context is missing."}</p>
-          <button className="mt-3 text-sm underline" onClick={handleLogout}>
-            Go to login
-          </button>
+          <button className="mt-3 text-sm underline" onClick={handleLogout}>Go to login</button>
         </section>
       </main>
     );
   }
 
   return (
-    <AppShell
-      user={user}
-      companies={companies}
-      activeCompany={activeCompany}
-      access={access}
-      onLogout={handleLogout}
-      onNavigate={handleNavigate}
-    >
-      <div className="rounded-lg border border-zinc-200 p-4">
-        <h2 className="text-lg font-medium text-zinc-900">General Ledger (Report)</h2>
-        <p className="mt-1 text-sm text-zinc-600">Ledger lines with date range, account filter, and row limit.</p>
-
-        <form className="mt-4 grid gap-2 md:grid-cols-5" onSubmit={handleRefresh}>
-          <input
-            type="date"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={filters.start_date}
-            onChange={(event) => setFilters((prev) => ({ ...prev, start_date: event.target.value }))}
-          />
-          <input
-            type="date"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={filters.end_date}
-            onChange={(event) => setFilters((prev) => ({ ...prev, end_date: event.target.value }))}
-          />
-          <select
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={filters.account_id}
-            onChange={(event) => setFilters((prev) => ({ ...prev, account_id: event.target.value }))}
-          >
-            <option value="">All accounts</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.code} - {account.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={filters.limit}
-            onChange={(event) => setFilters((prev) => ({ ...prev, limit: event.target.value }))}
-            placeholder="Limit"
-          />
-          <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
-            Refresh
-          </button>
-        </form>
-
-        {loadingReport || !report ? (
-          <p className="mt-4 text-sm text-zinc-600">Loading report...</p>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 text-left text-zinc-600">
-                  <th className="py-2 pr-3">Entry #</th>
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Account</th>
-                  <th className="py-2 pr-3">Description</th>
-                  <th className="py-2 pr-3">Debit</th>
-                  <th className="py-2 pr-3">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.rows.map((row) => (
-                  <tr key={row.line_id} className="border-b border-zinc-100">
-                    <td className="py-2 pr-3">{row.entry_no ?? "-"}</td>
-                    <td className="py-2 pr-3">{row.entry_date}</td>
-                    <td className="py-2 pr-3">
-                      {row.account_code} - {row.account_name}
-                    </td>
-                    <td className="py-2 pr-3">{row.description || "-"}</td>
-                    <td className="py-2 pr-3">{row.debit}</td>
-                    <td className="py-2 pr-3">{row.credit}</td>
-                  </tr>
+    <AppShell user={user} companies={companies} activeCompany={activeCompany} access={access} onLogout={handleLogout} onNavigate={handleNavigate}>
+      <PageHeader
+        title="General Ledger"
+        description="Ledger lines with date range, account filter, and row limit."
+        breadcrumbs={[{ label: "Reports" }, { label: "General Ledger" }]}
+        actions={
+          <form onSubmit={handleRefresh} className="flex flex-wrap items-center gap-2">
+            <Label className="text-xs text-muted-foreground">From</Label>
+            <Input type="date" value={filters.start_date} onChange={(e) => setFilters((p) => ({ ...p, start_date: e.target.value }))} className="h-8 w-36 text-sm" />
+            <Label className="text-xs text-muted-foreground">To</Label>
+            <Input type="date" value={filters.end_date} onChange={(e) => setFilters((p) => ({ ...p, end_date: e.target.value }))} className="h-8 w-36 text-sm" />
+            <Select value={filters.account_id || "all"} onValueChange={(v) => setFilters((p) => ({ ...p, account_id: v === "all" ? "" : v }))}>
+              <SelectTrigger className="h-8 w-44 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All accounts</SelectItem>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              </SelectContent>
+            </Select>
+            <Input value={filters.limit} onChange={(e) => setFilters((p) => ({ ...p, limit: e.target.value }))} placeholder="Limit" className="h-8 w-20 text-sm" />
+            <Button type="submit" size="sm" variant="outline">
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Run
+            </Button>
+          </form>
+        }
+      />
+
+      {loadingReport ? (
+        <div className="flex items-center gap-2 py-12 text-sm text-muted-foreground justify-center">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading report…
+        </div>
+      ) : !report ? null : (
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="font-semibold text-xs w-20">Entry #</TableHead>
+                <TableHead className="font-semibold text-xs w-28">Date</TableHead>
+                <TableHead className="font-semibold text-xs">Account</TableHead>
+                <TableHead className="font-semibold text-xs">Description</TableHead>
+                <TableHead className="font-semibold text-xs text-right">Debit</TableHead>
+                <TableHead className="font-semibold text-xs text-right">Credit</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-12 text-center">
+                    <p className="text-sm text-muted-foreground">No ledger entries for this period.</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                report.rows.map((row) => (
+                  <TableRow key={row.line_id}>
+                    <TableCell className="font-mono text-sm text-muted-foreground">{row.entry_no ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{row.entry_date}</TableCell>
+                    <TableCell className="text-sm">
+                      <span className="font-mono text-muted-foreground">{row.account_code}</span>
+                      {" "}
+                      {row.account_name}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{row.description || "—"}</TableCell>
+                    <TableCell className="text-sm text-right tabular-nums text-blue-700 font-medium">{fmt(row.debit)}</TableCell>
+                    <TableCell className="text-sm text-right tabular-nums text-orange-700 font-medium">{fmt(row.credit)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </AppShell>
   );
 }

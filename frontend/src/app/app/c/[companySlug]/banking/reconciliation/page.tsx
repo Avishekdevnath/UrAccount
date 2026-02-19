@@ -2,12 +2,40 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { ChevronRight, Loader2, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
 import { ApiError, createReconciliation, fetchBankAccounts, fetchReconciliations } from "@/lib/api-client";
 import type { BankAccount, BankReconciliation } from "@/lib/api-types";
 import { getCompanyReconciliationDetailPath } from "@/lib/company-routing";
 import { useCompanyContext } from "@/lib/use-company-context";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function ReconciliationPage() {
   const params = useParams<{ companySlug: string }>();
@@ -19,6 +47,8 @@ export default function ReconciliationPage() {
   const [reconciliations, setReconciliations] = useState<BankReconciliation[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [formError, setFormError] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     bank_account: "",
     start_date: new Date().toISOString().slice(0, 10),
@@ -48,21 +78,18 @@ export default function ReconciliationPage() {
   }
 
   useEffect(() => {
-    if (!activeCompany) {
-      return;
-    }
-    const companyId = activeCompany.id;
-    void loadData(companyId);
+    if (!activeCompany) return;
+    void loadData(activeCompany.id);
   }, [activeCompany]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeCompany || !canPost) {
-      return;
-    }
+    if (!activeCompany || !canPost) return;
     setFormError("");
+    setSubmitting(true);
     try {
       await createReconciliation(activeCompany.id, form);
+      setDialogOpen(false);
       await loadData(activeCompany.id);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -70,128 +97,139 @@ export default function ReconciliationPage() {
       } else {
         setFormError("Create failed.");
       }
+    } finally {
+      setSubmitting(false);
     }
   }
 
   if (isLoading) {
-    return <main className="flex min-h-screen items-center justify-center text-sm text-zinc-600">Loading...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      </main>
+    );
   }
 
   if (error || !user || !activeCompany || !access) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <section className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <section className="w-full max-w-md rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
           <p>{error || "Access context is missing."}</p>
-          <button className="mt-3 text-sm underline" onClick={handleLogout}>
-            Go to login
-          </button>
+          <button className="mt-3 text-sm underline" onClick={handleLogout}>Go to login</button>
         </section>
       </main>
     );
   }
 
   return (
-    <AppShell
-      user={user}
-      companies={companies}
-      activeCompany={activeCompany}
-      access={access}
-      onLogout={handleLogout}
-      onNavigate={handleNavigate}
-    >
-      <div className="rounded-lg border border-zinc-200 p-4">
-        <h2 className="text-lg font-medium text-zinc-900">Reconciliations</h2>
-        <p className="mt-1 text-sm text-zinc-600">Create a reconciliation period and finalize selected transactions.</p>
+    <AppShell user={user} companies={companies} activeCompany={activeCompany} access={access} onLogout={handleLogout} onNavigate={handleNavigate}>
+      <PageHeader
+        title="Reconciliation"
+        description="Create reconciliation periods and finalize selected transactions."
+        breadcrumbs={[{ label: "Banking" }, { label: "Reconciliation" }]}
+        actions={
+          canPost && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> New Reconciliation
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>New Reconciliation Period</DialogTitle>
+                </DialogHeader>
+                <form className="mt-2 grid gap-3" onSubmit={handleCreate}>
+                  <div className="grid gap-1.5">
+                    <Label>Bank Account</Label>
+                    <Select value={form.bank_account} onValueChange={(v) => setForm((p) => ({ ...p, bank_account: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
+                      <SelectContent>
+                        {bankAccounts.map((ba) => (
+                          <SelectItem key={ba.id} value={ba.id}>{ba.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label>Start Date</Label>
+                      <Input type="date" value={form.start_date} onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))} required />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>End Date</Label>
+                      <Input type="date" value={form.end_date} onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))} required />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label>Opening Balance</Label>
+                      <Input value={form.opening_balance} onChange={(e) => setForm((p) => ({ ...p, opening_balance: e.target.value }))} placeholder="0.00" required />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Closing Balance</Label>
+                      <Input value={form.closing_balance} onChange={(e) => setForm((p) => ({ ...p, closing_balance: e.target.value }))} placeholder="0.00" required />
+                    </div>
+                  </div>
+                  {formError && <p className="text-sm text-destructive">{formError}</p>}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={submitting || !form.bank_account}>
+                      {submitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Create
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )
+        }
+      />
 
-        <form className="mt-4 grid gap-3 md:grid-cols-5" onSubmit={handleCreate}>
-          <select
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={form.bank_account}
-            onChange={(event) => setForm((prev) => ({ ...prev, bank_account: event.target.value }))}
-            required
-          >
-            <option value="">Bank account</option>
-            {bankAccounts.map((bankAccount) => (
-              <option key={bankAccount.id} value={bankAccount.id}>
-                {bankAccount.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={form.start_date}
-            onChange={(event) => setForm((prev) => ({ ...prev, start_date: event.target.value }))}
-            required
-          />
-          <input
-            type="date"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={form.end_date}
-            onChange={(event) => setForm((prev) => ({ ...prev, end_date: event.target.value }))}
-            required
-          />
-          <input
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={form.opening_balance}
-            onChange={(event) => setForm((prev) => ({ ...prev, opening_balance: event.target.value }))}
-            placeholder="Opening"
-            required
-          />
-          <input
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-            value={form.closing_balance}
-            onChange={(event) => setForm((prev) => ({ ...prev, closing_balance: event.target.value }))}
-            placeholder="Closing"
-            required
-          />
-          <button
-            type="submit"
-            disabled={!canPost}
-            className="rounded-md bg-zinc-900 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-45 md:col-span-5 md:w-fit"
-          >
-            Create Reconciliation
-          </button>
-        </form>
-        {formError ? <p className="mt-2 text-sm text-red-600">{formError}</p> : null}
-
-        <div className="mt-6 overflow-x-auto">
-          {loadingData ? (
-            <p className="text-sm text-zinc-600">Loading reconciliations...</p>
-          ) : (
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 text-left text-zinc-600">
-                  <th className="py-2 pr-3">Bank Account</th>
-                  <th className="py-2 pr-3">Start</th>
-                  <th className="py-2 pr-3">End</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reconciliations.map((reconciliation) => (
-                  <tr key={reconciliation.id} className="border-b border-zinc-100">
-                    <td className="py-2 pr-3">{reconciliation.bank_account}</td>
-                    <td className="py-2 pr-3">{reconciliation.start_date}</td>
-                    <td className="py-2 pr-3">{reconciliation.end_date}</td>
-                    <td className="py-2 pr-3 uppercase">{reconciliation.status}</td>
-                    <td className="py-2 pr-3">
-                      <button
-                        onClick={() =>
-                          handleNavigate(getCompanyReconciliationDetailPath(activeCompany.slug, reconciliation.id))
-                        }
-                        className="rounded border border-zinc-300 px-2 py-1 text-xs"
-                      >
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="font-semibold text-xs">Bank Account</TableHead>
+              <TableHead className="font-semibold text-xs">Period</TableHead>
+              <TableHead className="font-semibold text-xs">Status</TableHead>
+              <TableHead className="font-semibold text-xs w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loadingData ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-12 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : reconciliations.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-12 text-center">
+                  <p className="text-sm text-muted-foreground">No reconciliation periods yet.</p>
+                </TableCell>
+              </TableRow>
+            ) : (
+              reconciliations.map((rec) => (
+                <TableRow
+                  key={rec.id}
+                  className="cursor-pointer hover:bg-muted/30"
+                  onClick={() => handleNavigate(getCompanyReconciliationDetailPath(activeCompany.slug, rec.id))}
+                >
+                  <TableCell className="text-sm font-medium">{rec.bank_account}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{rec.start_date} — {rec.end_date}</TableCell>
+                  <TableCell><StatusBadge status={rec.status} /></TableCell>
+                  <TableCell>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </AppShell>
   );
