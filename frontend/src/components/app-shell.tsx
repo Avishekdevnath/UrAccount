@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Building2 } from "lucide-react";
 import type { Company, CompanyAccess, UserMe } from "@/lib/api-types";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -20,11 +21,13 @@ export function AppShell({
   user,
   companies,
   activeCompany,
-  access: _access,
+  access,
   onLogout,
   onNavigate,
   children,
 }: AppShellProps) {
+  void access;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* ── Sidebar ─────────────────────────────────────────── */}
@@ -33,14 +36,17 @@ export function AppShell({
         style={{ background: "var(--sidebar)" }}
       >
         {/* Logo / Brand */}
-        <div className="flex h-14 items-center gap-2.5 px-5 border-b border-sidebar-border shrink-0">
+        <Link
+          href="/"
+          className="flex h-14 items-center gap-2.5 px-5 border-b border-sidebar-border shrink-0 no-underline hover:no-underline"
+        >
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
             <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="text-base font-semibold tracking-tight text-sidebar-foreground">
             UrAccount
           </span>
-        </div>
+        </Link>
 
         {/* Navigation */}
         <SidebarNav companySlug={activeCompany.slug} onNavigate={onNavigate} />

@@ -18,11 +18,14 @@ from apps.rbac.models import CompanyRole, CompanyRoleAssignment
 from apps.rbac.services import assign_owner_role, ensure_default_roles_for_company
 from apps.sales.models import Invoice, InvoiceStatus, Receipt, ReceiptStatus
 from apps.sales.services import post_invoice, post_receipt, replace_invoice_lines, replace_receipt_allocations
+from apps.system_admin.models import SystemRole
 from apps.users.models import User
 
 DEMO_PASSWORD = "Demo@12345"
 DEMO_COMPANY_NAME = "Demo Company"
 DEMO_COMPANY_SLUG = "demo-company"
+DEMO_SYSTEM_ADMIN_EMAIL = "sysadmin@demo.local"
+DEMO_SYSTEM_ADMIN_NAME = "Demo System Admin"
 
 DEMO_INVOICE_NOTE = "seed:demo-invoice"
 DEMO_RECEIPT_NOTE = "seed:demo-receipt"
@@ -42,7 +45,7 @@ def _upsert_user(*, email: str, full_name: str, password: str, is_staff: bool = 
     user.is_active = True
     user.is_staff = is_staff
     user.set_password(password)
-    user.save(update_fields=["full_name", "is_active", "is_staff", "password"])
+    user.save(update_fields=["full_name", "is_active", "is_staff", "password", "password_changed_at"])
     return user
 
 
@@ -415,15 +418,26 @@ def seed_demo_company(*, password: str = DEMO_PASSWORD, include_company_data: bo
     admin = _upsert_user(email="admin@demo.local", full_name="Demo Admin", password=password)
     accountant = _upsert_user(email="accountant@demo.local", full_name="Demo Accountant", password=password)
     viewer = _upsert_user(email="viewer@demo.local", full_name="Demo Viewer", password=password)
+    system_admin = _upsert_user(
+        email=DEMO_SYSTEM_ADMIN_EMAIL,
+        full_name=DEMO_SYSTEM_ADMIN_NAME,
+        password=password,
+        is_staff=True,
+    )
 
     _assign_role(company=company, user=admin, role_name=ROLE_ADMIN)
     _assign_role(company=company, user=accountant, role_name=ROLE_ACCOUNTANT)
     _assign_role(company=company, user=viewer, role_name=ROLE_VIEWER)
+    _assign_role(company=company, user=system_admin, role_name=ROLE_VIEWER)
     _assign_role(company=company, user=owner, role_name=ROLE_OWNER)
+    SystemRole.objects.update_or_create(
+        user=system_admin,
+        defaults={"role": SystemRole.ROLE_SUPER_ADMIN, "is_active": True},
+    )
 
     summary = {
         "company_slug": company.slug,
-        "users": [owner.email, admin.email, accountant.email, viewer.email],
+        "users": [owner.email, admin.email, accountant.email, viewer.email, system_admin.email],
     }
     if not include_company_data:
         summary["with_data"] = False

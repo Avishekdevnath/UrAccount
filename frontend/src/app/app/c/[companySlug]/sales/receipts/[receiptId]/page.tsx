@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { Printer } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import {
@@ -18,6 +19,7 @@ import {
 import type { Account, Contact, Invoice, Receipt } from "@/lib/api-types";
 import { getCompanyReceiptsPath } from "@/lib/company-routing";
 import { generateIdempotencyKey } from "@/lib/idempotency";
+import { printReceipt } from "@/lib/print/documents";
 import { useCompanyContext } from "@/lib/use-company-context";
 
 type AllocationDraft = {
@@ -215,6 +217,29 @@ export default function ReceiptDetailPage() {
     }
   }
 
+  function handlePrint() {
+    if (!receipt || !activeCompany) {
+      return;
+    }
+
+    const customerName = customerNameById[receipt.customer] || receipt.customer;
+    const invoiceNumberById: Record<string, string> = {};
+    for (const invoice of invoices) {
+      invoiceNumberById[invoice.id] = invoice.invoice_no ? `#${invoice.invoice_no}` : invoice.id;
+    }
+
+    const printed = printReceipt({
+      receipt,
+      companyName: activeCompany.name,
+      customerName,
+      invoiceNumberById,
+    });
+
+    if (!printed) {
+      setActionError("Unable to open print dialog. Check browser print permissions and try again.");
+    }
+  }
+
   if (isLoading) {
     return <main className="flex min-h-screen items-center justify-center text-sm text-zinc-600">Loading...</main>;
   }
@@ -249,12 +274,21 @@ export default function ReceiptDetailPage() {
               #{receipt?.receipt_no ?? "-"} | Status: {receipt?.status?.toUpperCase() || "-"}
             </p>
           </div>
-          <button
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-            onClick={() => handleNavigate(getCompanyReceiptsPath(activeCompany.slug))}
-          >
-            Back to Receipts
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+              onClick={handlePrint}
+              disabled={!receipt}
+            >
+              <Printer className="mr-1.5 h-4 w-4" /> Print / PDF
+            </button>
+            <button
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+              onClick={() => handleNavigate(getCompanyReceiptsPath(activeCompany.slug))}
+            >
+              Back to Receipts
+            </button>
+          </div>
         </div>
 
         {loadingPage || !receipt ? (

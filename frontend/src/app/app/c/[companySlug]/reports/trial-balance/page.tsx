@@ -2,12 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, Printer, RefreshCw } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { fetchReportTrialBalance } from "@/lib/api-client";
 import type { ReportTrialBalance } from "@/lib/api-types";
+import { printTrialBalanceReport } from "@/lib/print/reports";
 import { useCompanyContext } from "@/lib/use-company-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,11 @@ export default function ReportTrialBalancePage() {
     await loadReport(activeCompany.id, filters.start_date, filters.end_date);
   }
 
+  function handlePrint() {
+    if (!activeCompany || !report) return;
+    void printTrialBalanceReport({ companyName: activeCompany.name, report });
+  }
+
   const totalDebit = report?.rows.reduce((sum, r) => sum + parseFloat(r.total_debit || "0"), 0) ?? 0;
   const totalCredit = report?.rows.reduce((sum, r) => sum + parseFloat(r.total_credit || "0"), 0) ?? 0;
   const isBalanced = report ? Math.abs(totalDebit - totalCredit) < 0.01 : null;
@@ -111,6 +117,9 @@ export default function ReportTrialBalancePage() {
               <Input type="date" value={filters.end_date} onChange={(e) => setFilters((p) => ({ ...p, end_date: e.target.value }))} className="h-8 w-36 text-sm" />
               <Button type="submit" size="sm" variant="outline">
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Run
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={handlePrint} disabled={!report}>
+                <Printer className="mr-1.5 h-3.5 w-3.5" /> Print / PDF
               </Button>
             </form>
           </div>

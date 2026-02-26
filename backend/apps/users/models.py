@@ -1,6 +1,7 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.common.models import TimeStampedUUIDModel
@@ -38,6 +39,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedUUIDModel):
     full_name = models.CharField(max_length=255)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    password_changed_at = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()
 
@@ -50,3 +52,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedUUIDModel):
 
     def __str__(self):
         return self.email
+
+    def set_password(self, raw_password):
+        super().set_password(raw_password)
+        self.password_changed_at = timezone.now()

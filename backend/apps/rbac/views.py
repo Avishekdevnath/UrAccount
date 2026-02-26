@@ -18,6 +18,7 @@ def _get_member_company(*, user, company_id):
     return get_object_or_404(
         Company,
         id=company_id,
+        is_active=True,
         memberships__user=user,
         memberships__status=CompanyMemberStatus.ACTIVE,
     )

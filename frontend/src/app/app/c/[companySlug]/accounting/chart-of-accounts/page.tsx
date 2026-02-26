@@ -29,7 +29,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 
 const ACCOUNT_TYPE_COLORS: Record<Account["type"], string> = {
   asset:     "bg-blue-50 text-blue-700 border-blue-200",

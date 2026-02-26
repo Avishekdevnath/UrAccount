@@ -33,6 +33,8 @@ def assign_owner_role(company: Company, user):
 def user_has_company_permission(user, company: Company, permission_code: str) -> bool:
     if not user.is_authenticated:
         return False
+    if not company.is_active:
+        return False
 
     return CompanyRoleAssignment.objects.filter(
         company=company,

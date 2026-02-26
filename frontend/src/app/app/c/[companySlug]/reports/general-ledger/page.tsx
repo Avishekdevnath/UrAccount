@@ -2,12 +2,13 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, Printer, RefreshCw } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { fetchAccounts, fetchGeneralLedgerReport } from "@/lib/api-client";
 import type { Account, GeneralLedgerReport } from "@/lib/api-types";
+import { printGeneralLedgerReport } from "@/lib/print/reports";
 import { useCompanyContext } from "@/lib/use-company-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +81,11 @@ export default function GeneralLedgerReportPage() {
     await loadData(activeCompany.id);
   }
 
+  function handlePrint() {
+    if (!activeCompany || !report) return;
+    void printGeneralLedgerReport({ companyName: activeCompany.name, report });
+  }
+
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -125,6 +131,9 @@ export default function GeneralLedgerReportPage() {
             <Input value={filters.limit} onChange={(e) => setFilters((p) => ({ ...p, limit: e.target.value }))} placeholder="Limit" className="h-8 w-20 text-sm" />
             <Button type="submit" size="sm" variant="outline">
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Run
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={handlePrint} disabled={!report}>
+              <Printer className="mr-1.5 h-3.5 w-3.5" /> Print / PDF
             </Button>
           </form>
         }

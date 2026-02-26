@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Printer } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/lib/api-client";
 import type { Account, Bill, Contact } from "@/lib/api-types";
 import { getCompanyBillsPath } from "@/lib/company-routing";
+import { printBill } from "@/lib/print/documents";
 import { useCompanyContext } from "@/lib/use-company-context";
 
 type BillLineDraft = {
@@ -201,6 +203,23 @@ export default function BillDetailPage() {
     }
   }
 
+  function handlePrint() {
+    if (!bill || !activeCompany) {
+      return;
+    }
+
+    const vendorName = vendors.find((vendor) => vendor.id === bill.vendor)?.name || bill.vendor;
+    const printed = printBill({
+      bill,
+      companyName: activeCompany.name,
+      vendorName,
+    });
+
+    if (!printed) {
+      setActionError("Unable to open print dialog. Check browser print permissions and try again.");
+    }
+  }
+
   if (isLoading) {
     return <main className="flex min-h-screen items-center justify-center text-sm text-zinc-600">Loading...</main>;
   }
@@ -235,12 +254,21 @@ export default function BillDetailPage() {
               #{bill?.bill_no ?? "-"} | Status: {bill?.status?.toUpperCase() || "-"}
             </p>
           </div>
-          <button
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-            onClick={() => handleNavigate(getCompanyBillsPath(activeCompany.slug))}
-          >
-            Back to Bills
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+              onClick={handlePrint}
+              disabled={!bill}
+            >
+              <Printer className="mr-1.5 h-4 w-4" /> Print / PDF
+            </button>
+            <button
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+              onClick={() => handleNavigate(getCompanyBillsPath(activeCompany.slug))}
+            >
+              Back to Bills
+            </button>
+          </div>
         </div>
 
         {loadingPage || !bill ? (

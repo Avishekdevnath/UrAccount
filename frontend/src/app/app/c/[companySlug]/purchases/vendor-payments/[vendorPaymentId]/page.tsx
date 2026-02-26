@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2, Plus, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Printer, Save } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -21,6 +21,7 @@ import {
 import type { Account, Bill, Contact, VendorPayment } from "@/lib/api-types";
 import { getCompanyVendorPaymentsPath } from "@/lib/company-routing";
 import { generateIdempotencyKey } from "@/lib/idempotency";
+import { printVendorPayment } from "@/lib/print/documents";
 import { useCompanyContext } from "@/lib/use-company-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,6 +173,27 @@ export default function VendorPaymentDetailPage() {
     }
   }
 
+  function handlePrint() {
+    if (!vendorPayment || !activeCompany) return;
+
+    const vendorName = vendorNameById[vendorPayment.vendor] || vendorPayment.vendor;
+    const billNumberById: Record<string, string> = {};
+    for (const bill of bills) {
+      billNumberById[bill.id] = bill.bill_no ? `#${bill.bill_no}` : bill.id;
+    }
+
+    const printed = printVendorPayment({
+      vendorPayment,
+      companyName: activeCompany.name,
+      vendorName,
+      billNumberById,
+    });
+
+    if (!printed) {
+      setActionError("Unable to open print dialog. Check browser print permissions and try again.");
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -200,6 +222,9 @@ export default function VendorPaymentDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             {vendorPayment && <StatusBadge status={vendorPayment.status} />}
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={!vendorPayment}>
+              <Printer className="mr-1.5 h-3.5 w-3.5" /> Print / PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => handleNavigate(getCompanyVendorPaymentsPath(activeCompany.slug))}>
               <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back
             </Button>

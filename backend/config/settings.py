@@ -40,12 +40,9 @@ load_env_file(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-+r9+^i0$s*)muc+*ik67=hgob4b*l(ifpo6mqt^7$w9k#x==k^"
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-+r9+^i0$s*)muc+*ik67=hgob4b*l(ifpo6mqt^7$w9k#x==k^")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -63,6 +60,17 @@ def env_int(name: str, default: int) -> int:
         return int(value)
     except ValueError:
         return default
+
+
+def env_list(name: str, default: list[str] | None = None) -> list[str]:
+    value = os.getenv(name)
+    if value is None:
+        return list(default or [])
+    return [item.strip().lower() for item in value.split(",") if item.strip()]
+
+
+DEBUG = env_bool("DEBUG", True)
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost", ".vercel.app"])
 
 
 def database_from_url(url: str) -> dict:
@@ -99,6 +107,10 @@ def database_from_url(url: str) -> dict:
 
 
 ENABLE_BROWSABLE_API = env_bool("ENABLE_BROWSABLE_API", DEBUG)
+SYSTEM_ADMIN_ENABLED = env_bool("SYSTEM_ADMIN_ENABLED", False)
+AI_ENABLED = env_bool("AI_ENABLED", False)
+SUBSCRIPTION_ENABLED = env_bool("SUBSCRIPTION_ENABLED", False)
+PROTECTED_SYSTEM_USER_EMAILS = env_list("PROTECTED_SYSTEM_USER_EMAILS", default=[])
 
 
 # Application definition
@@ -128,12 +140,14 @@ INSTALLED_APPS = [
     "apps.documents",
     "apps.audit",
     "apps.idempotency",
+    "apps.system_admin",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "apps.common.middleware.RequestIDMiddleware",
     "apps.common.middleware.ErrorEnvelopeMiddleware",
+    "apps.system_admin.middleware.SystemAdminErrorAuditMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -236,7 +250,7 @@ STATIC_URL = "static/"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.users.authentication.PasswordVersionJWTAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "apps.common.pagination.DefaultListPagination",
     "DEFAULT_RENDERER_CLASSES": (
@@ -256,7 +270,13 @@ REST_FRAMEWORK = {
         "user": "120/min",
         "anon": "60/min",
         "auth_login": "10/min",
+        "system_password_reset": "20/min",
+        "system_role_mutation": "60/min",
     },
+}
+
+SIMPLE_JWT = {
+    "TOKEN_OBTAIN_SERIALIZER": "apps.users.serializers_jwt.PasswordVersionTokenObtainPairSerializer",
 }
 
 if ENABLE_BROWSABLE_API:
@@ -273,10 +293,13 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.1.0",
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+)
 
 AUTH_USER_MODEL = "users.User"
 

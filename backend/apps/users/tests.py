@@ -9,7 +9,14 @@ from apps.companies.models import Company
 from apps.contacts.models import Contact
 from apps.purchases.models import Bill, VendorPayment
 from apps.sales.models import Invoice, Receipt
-from apps.users.demo_seed import DEMO_BILL_NOTE, DEMO_INVOICE_NOTE, DEMO_RECEIPT_NOTE, DEMO_VENDOR_PAYMENT_NOTE
+from apps.system_admin.models import SystemRole
+from apps.users.demo_seed import (
+    DEMO_BILL_NOTE,
+    DEMO_INVOICE_NOTE,
+    DEMO_RECEIPT_NOTE,
+    DEMO_SYSTEM_ADMIN_EMAIL,
+    DEMO_VENDOR_PAYMENT_NOTE,
+)
 from apps.users.models import User
 
 
@@ -76,3 +83,6 @@ class DemoSeedCommandTests(TestCase):
         self.assertEqual(VendorPayment.objects.filter(company=company, notes=DEMO_VENDOR_PAYMENT_NOTE).count(), 1)
         self.assertGreaterEqual(BankTransaction.objects.filter(company=company).count(), 1)
         self.assertEqual(BankReconciliation.objects.filter(company=company).count(), 1)
+        system_admin = User.objects.get(email=DEMO_SYSTEM_ADMIN_EMAIL)
+        self.assertTrue(system_admin.is_staff)
+        self.assertTrue(SystemRole.objects.filter(user=system_admin, role=SystemRole.ROLE_SUPER_ADMIN).exists())

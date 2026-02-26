@@ -10,6 +10,8 @@ export type UserMe = {
   is_active: boolean;
   is_staff: boolean;
   is_superuser: boolean;
+  system_role: "SUPER_ADMIN" | "SUPPORT" | null;
+  system_role_active: boolean | null;
 };
 
 export type Company = {
@@ -28,6 +30,18 @@ export type CompanyAccess = {
   company_id: string;
   roles: string[];
   permissions: string[];
+};
+
+export type CompanyMember = {
+  id: string;
+  company: string;
+  user: string;
+  user_email: string;
+  user_full_name: string;
+  status: "active" | "invited" | "disabled";
+  joined_at: string;
+  created_at: string;
+  roles?: string[];
 };
 
 export type Account = {
@@ -381,4 +395,140 @@ export type GeneralLedgerReport = {
   end_date: string;
   limit: number;
   rows: GeneralLedgerRow[];
+};
+
+// ── System Admin types ────────────────────────────────────────────────────────
+
+export type SystemRole = "SUPER_ADMIN" | "SUPPORT";
+
+export type SystemCompany = {
+  id: string;
+  name: string;
+  slug: string;
+  base_currency: string;
+  timezone: string;
+  fiscal_year_start_month: number;
+  is_active: boolean;
+  members_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SystemCompanyFeatureFlags = {
+  ai_enabled: boolean;
+  ai_suggestions_enabled: boolean;
+  ai_rag_enabled: boolean;
+  extra_flags: Record<string, unknown>;
+};
+
+export type SystemCompanyQuotas = {
+  max_users: number | null;
+  max_storage_mb: number | null;
+  max_api_requests_per_minute: number | null;
+};
+
+export type SystemCompanyDetail = SystemCompany & {
+  feature_flags: SystemCompanyFeatureFlags;
+  quotas: SystemCompanyQuotas;
+};
+
+export type SystemCompanyBootstrapInput = {
+  company: {
+    name: string;
+    slug: string;
+    base_currency: string;
+    timezone: string;
+    fiscal_year_start_month: number;
+  };
+  owner: {
+    email: string;
+    full_name?: string;
+    password?: string;
+  };
+};
+
+export type SystemCompanyBootstrapResult = {
+  company_id: string;
+  company_slug: string;
+  owner_user_id: string;
+  owner_email: string;
+  owner_created: boolean;
+};
+
+export type SystemUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  company_count: number;
+  system_role: SystemRole | null;
+  system_role_active: boolean | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SystemUserMembership = {
+  id: string;
+  company_id: string;
+  company_slug: string;
+  company_name: string;
+  company_is_active: boolean;
+  status: string;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SystemUserDetail = SystemUser & {
+  memberships: SystemUserMembership[];
+};
+
+export type SystemUserCreateInput = {
+  email: string;
+  full_name: string;
+  password: string;
+  is_active?: boolean;
+  is_staff?: boolean;
+};
+
+export type SystemUserUpdateInput = {
+  full_name?: string;
+  is_active?: boolean;
+  is_staff?: boolean;
+};
+
+export type SystemCompanyMember = {
+  id: string;
+  company: string;
+  user: string;
+  user_email: string;
+  user_full_name: string;
+  status: string;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
+  roles: string[];
+};
+
+export type SystemAuditLog = {
+  id: string;
+  actor_email: string | null;
+  ip_address: string | null;
+  request_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type SystemGlobalFeatureFlags = {
+  system_admin_enabled: boolean;
+  ai_enabled: boolean;
+  subscription_enabled: boolean;
+  browsable_api_enabled: boolean;
 };

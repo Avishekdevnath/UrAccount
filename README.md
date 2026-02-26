@@ -99,10 +99,21 @@ Main backend apps:
 - `purchases`: bills, vendor payments, AP aging
 - `banking`: imports, transactions, matching, reconciliation
 - `reports`: P&L, BS, Cash Flow, Trial Balance, General Ledger
+- `system_admin`: global control-plane APIs (feature-flagged)
 - `audit`, `idempotency`, `common`: cross-cutting concerns
 
 Base API prefix:
 - `/api/v1/`
+
+System admin APIs (available only when `SYSTEM_ADMIN_ENABLED=1`):
+- `/api/v1/system/health/`
+- `/api/v1/system/companies/`
+- `/api/v1/system/companies/<company_id>/`
+- `/api/v1/system/companies/<company_id>/feature-flags/` (`GET`, `PATCH` by `SUPER_ADMIN`)
+- `/api/v1/system/companies/<company_id>/quotas/` (`GET`, `PATCH` by `SUPER_ADMIN`)
+- `/api/v1/system/users/`
+- `/api/v1/system/users/<user_id>/`
+- `/api/v1/system/feature-flags/`
 
 Docs endpoints:
 - `/api/v1/schema/`
@@ -168,7 +179,7 @@ py -m venv .venv
 Install backend dependencies in your venv (if not already installed):
 
 ```powershell
-pip install django djangorestframework djangorestframework-simplejwt drf-spectacular django-filter django-cors-headers psycopg[binary]
+pip install -r requirements.txt
 ```
 
 Create/verify environment file:
@@ -182,6 +193,46 @@ Set `DATABASE_URL` in `backend/.env` (Neon example pattern):
 ```env
 DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
 ```
+
+Optional feature flags:
+
+```env
+SYSTEM_ADMIN_ENABLED=0
+AI_ENABLED=0
+SUBSCRIPTION_ENABLED=0
+```
+
+Bootstrap first system admin:
+
+```powershell
+py manage.py grant_system_role your-email@example.com --role SUPER_ADMIN
+```
+
+Bootstrap/update an operator account (idempotent):
+
+```powershell
+py manage.py bootstrap_system_operator --email ops-admin@yourco.com --full-name "Ops Admin" --password "StrongPass@123" --role SUPER_ADMIN
+```
+
+Run system-admin readiness checks:
+
+```powershell
+py manage.py system_admin_preflight --strict
+py manage.py system_admin_access_check --strict
+py manage.py system_admin_query_benchmark --strict --page-size 25
+py manage.py system_admin_ops_snapshot --hours 24 --top 10
+```
+
+Or run the bundled stage-check script:
+
+```powershell
+cd backend
+powershell -ExecutionPolicy Bypass -File .\scripts\system_admin_stage_check.ps1 -SkipTests
+```
+
+Staging/prod rollout evidence templates:
+- `backend/docs/system_admin_staging_signoff.md`
+- `backend/docs/system_admin_prod_rollout_log.md`
 
 Run migrations and seed demo data:
 
@@ -210,6 +261,10 @@ Optional env for API base URL:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
+# Master UI toggle for system-admin routes/redirect behavior
+NEXT_PUBLIC_SYSTEM_ADMIN_UI=0
+# Optional: show system-admin demo account pill on login (local demo only)
+NEXT_PUBLIC_SHOW_SYSTEM_ADMIN_DEMO=0
 ```
 
 Start frontend locally:
@@ -238,6 +293,7 @@ py manage.py seed_demo_accounts
 | Admin | `admin@demo.local` | `Demo@12345` |
 | Accountant | `accountant@demo.local` | `Demo@12345` |
 | Viewer | `viewer@demo.local` | `Demo@12345` |
+| System Admin | `sysadmin@demo.local` | `Demo@12345` |
 
 Demo tenant:
 - Company: `Demo Company`
@@ -268,10 +324,18 @@ cd frontend
 npm run lint
 npm run typecheck
 npm run build
+npm run e2e
+```
+
+One-shot release gate (from repo root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release_gate_check.ps1 -SkipBackendTests -SkipFrontendE2E
 ```
 
 Note:
 - Frontend build is configured for memory-safe worker limits in constrained Windows environments.
+- Frontend E2E specs are in `frontend/e2e/` (system-admin flows, route-mocked).
 
 ---
 
@@ -290,6 +354,9 @@ Recommended production topology:
 - Reverse proxy:
   - Nginx
   - TLS via Let's Encrypt
+
+System admin operations runbook:
+- `backend/docs/system_admin_runbook.md`
 
 Minimum server baseline:
 - 2 vCPU, 4 GB RAM, 40 GB SSD

@@ -38,3 +38,6 @@ urlpatterns = [
 
 if settings.ENABLE_BROWSABLE_API:
     urlpatterns.insert(1, path("api-auth/", include("rest_framework.urls")))
+
+if settings.SYSTEM_ADMIN_ENABLED:
+    urlpatterns.append(path("api/v1/system/", include("apps.system_admin.urls")))

@@ -11,6 +11,7 @@ import {
   Receipt,
   RefreshCw,
   Scale,
+  Settings,
   ShoppingCart,
   TrendingUp,
   Upload,
@@ -92,6 +93,12 @@ function buildNav(slug: string): NavGroup[] {
         { label: "General Ledger", path: `${base}/reports/general-ledger`, icon: <BookOpen className="h-3.5 w-3.5" /> },
       ],
     },
+    {
+      title: "Settings",
+      icon: <Settings className="h-4 w-4" />,
+      matchSegment: "settings",
+      items: [{ label: "Team", path: `${base}/settings/team`, icon: <Users className="h-3.5 w-3.5" /> }],
+    },
   ];
 }
 
@@ -106,7 +113,8 @@ export function SidebarNav({ companySlug, onNavigate }: SidebarNavProps) {
   const dashboardPath = `/app/c/${companySlug}/dashboard`;
 
   // Determine which group is active from the URL
-  const activeSegment = pathname.split("/")[5] ?? "";
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const activeSegment = pathSegments[3] ?? "";
 
   // Track which groups are expanded — default open the active one
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
@@ -129,7 +137,7 @@ export function SidebarNav({ companySlug, onNavigate }: SidebarNavProps) {
       <button
         onClick={() => onNavigate(dashboardPath)}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
           isDashboardActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -153,7 +161,7 @@ export function SidebarNav({ companySlug, onNavigate }: SidebarNavProps) {
             <button
               onClick={() => toggle(group.matchSegment)}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isGroupActive || hasActiveChild
                   ? "text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:text-sidebar-foreground",
@@ -180,7 +188,7 @@ export function SidebarNav({ companySlug, onNavigate }: SidebarNavProps) {
                       key={item.path}
                       onClick={() => onNavigate(item.path)}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                         isActive
                           ? "bg-sidebar-primary text-sidebar-primary-foreground"
                           : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

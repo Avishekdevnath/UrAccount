@@ -104,6 +104,10 @@ export function getCompanyGeneralLedgerPath(companySlug: string) {
   return `/app/c/${companySlug}/reports/general-ledger`;
 }
 
+export function getCompanyTeamSettingsPath(companySlug: string) {
+  return `/app/c/${companySlug}/settings/team`;
+}
+
 export function getFirstCompanyDashboardPath(companies: Company[]) {
   const first = companies[0];
   if (!first) {

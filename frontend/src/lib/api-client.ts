@@ -13,6 +13,7 @@ import type {
   CashFlowReport,
   Company,
   CompanyAccess,
+  CompanyMember,
   Contact,
   ContactType,
   GeneralLedgerReport,
@@ -44,11 +45,13 @@ type PaginatedResponse<T> = {
 class ApiError extends Error {
   status: number;
   payload: unknown;
+  requestId: string | null;
 
-  constructor(message: string, status: number, payload: unknown) {
+  constructor(message: string, status: number, payload: unknown, requestId: string | null = null) {
     super(message);
     this.status = status;
     this.payload = payload;
+    this.requestId = requestId;
   }
 }
 
@@ -125,7 +128,8 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
 
   const payload = await parseResponse(response);
   if (!response.ok) {
-    throw new ApiError("API request failed", response.status, payload);
+    const requestId = response.headers.get("X-Request-ID") ?? response.headers.get("x-request-id");
+    throw new ApiError("API request failed", response.status, payload, requestId);
   }
   return payload as T;
 }
@@ -167,6 +171,63 @@ export async function fetchCompanies() {
 
 export async function fetchMyCompanyAccess(companyId: string) {
   return apiRequest<CompanyAccess>(`/rbac/companies/${companyId}/me/`);
+}
+
+export async function fetchCompanyMembers(companyId: string) {
+  const payload = await apiRequest<CompanyMember[] | PaginatedResponse<CompanyMember>>(
+    `/companies/${companyId}/members/`
+  );
+  return normalizeListResponse(payload);
+}
+
+export async function createCompanyMemberUser(
+  companyId: string,
+  payload: {
+    email: string;
+    full_name: string;
+    password: string;
+    role?: "Admin" | "Accountant" | "Viewer";
+  }
+) {
+  return apiRequest<CompanyMember>(`/companies/${companyId}/members/create-user/`, {
+    method: "POST",
+    body: payload as Record<string, unknown>,
+  });
+}
+
+export async function resetCompanyMemberPassword(companyId: string, userId: string, newPassword: string) {
+  return apiRequest<{ detail: string }>(`/companies/${companyId}/members/${userId}/reset-password/`, {
+    method: "POST",
+    body: { new_password: newPassword },
+  });
+}
+
+export async function updateCompanyMemberStatus(
+  companyId: string,
+  userId: string,
+  statusValue: "active" | "invited" | "disabled"
+) {
+  return apiRequest<CompanyMember>(`/companies/${companyId}/members/${userId}/`, {
+    method: "PATCH",
+    body: { status: statusValue },
+  });
+}
+
+export async function replaceCompanyMemberRoles(companyId: string, userId: string, roles: string[]) {
+  return apiRequest<{ company_id: string; user_id: string; roles: string[] }>(
+    `/companies/${companyId}/members/${userId}/roles/`,
+    {
+      method: "PATCH",
+      body: { roles },
+    }
+  );
+}
+
+export async function removeCompanyMember(companyId: string, userId: string) {
+  return apiRequest<void>(`/companies/${companyId}/members/${userId}/`, {
+    method: "DELETE",
+    body: {},
+  });
 }
 
 export async function fetchAccounts(companyId: string) {
@@ -797,3 +858,206 @@ export async function fetchGeneralLedgerReport(
 }
 
 export { ApiError };
+export function formatApiError(error: unknown, fallback = "Request failed") {
+  if (error instanceof ApiError) {
+    let detail = fallback;
+    let requestId = error.requestId;
+    if (typeof error.payload === "string" && error.payload.trim()) {
+      detail = error.payload;
+    } else if (error.payload && typeof error.payload === "object") {
+      const payload = error.payload as {
+        detail?: unknown;
+        request_id?: unknown;
+        error?: { request_id?: unknown };
+      };
+      if (!requestId) {
+        const nestedRequestId = payload.error?.request_id ?? payload.request_id;
+        if (typeof nestedRequestId === "string" && nestedRequestId.trim()) {
+          requestId = nestedRequestId;
+        }
+      }
+      if (typeof payload.detail === "string" && payload.detail.trim()) {
+        detail = payload.detail;
+      } else {
+        detail = JSON.stringify(error.payload);
+      }
+    }
+    return requestId ? `${detail} (request_id: ${requestId})` : detail;
+  }
+  return fallback;
+}
+
+// ── System Admin API ──────────────────────────────────────────────────────────
+
+import type {
+  SystemAuditLog,
+  SystemCompanyBootstrapInput,
+  SystemCompanyBootstrapResult,
+  SystemCompany,
+  SystemCompanyDetail,
+  SystemCompanyFeatureFlags,
+  SystemCompanyMember,
+  SystemCompanyQuotas,
+  SystemGlobalFeatureFlags,
+  SystemRole,
+  SystemUserCreateInput,
+  SystemUser,
+  SystemUserDetail,
+  SystemUserUpdateInput,
+} from "@/lib/api-types";
+
+export async function systemFetchCompanies() {
+  const payload = await apiRequest<SystemCompany[] | PaginatedResponse<SystemCompany>>("/system/companies/");
+  return normalizeListResponse(payload);
+}
+
+export async function systemFetchCompany(companyId: string) {
+  return apiRequest<SystemCompanyDetail>(`/system/companies/${companyId}/`);
+}
+
+export async function systemBootstrapCompany(payload: SystemCompanyBootstrapInput) {
+  return apiRequest<SystemCompanyBootstrapResult>("/system/companies/bootstrap/", {
+    method: "POST",
+    body: payload as Record<string, unknown>,
+  });
+}
+
+export async function systemFetchCompanyFeatureFlags(companyId: string) {
+  return apiRequest<{ company_id: string; company_slug: string; feature_flags: SystemCompanyFeatureFlags }>(
+    `/system/companies/${companyId}/feature-flags/`
+  );
+}
+
+export async function systemUpdateCompanyFeatureFlags(
+  companyId: string,
+  updates: Partial<SystemCompanyFeatureFlags>
+) {
+  return apiRequest<{ company_id: string; company_slug: string; feature_flags: SystemCompanyFeatureFlags }>(
+    `/system/companies/${companyId}/feature-flags/`,
+    { method: "PATCH", body: updates as Record<string, unknown> }
+  );
+}
+
+export async function systemFetchCompanyQuotas(companyId: string) {
+  return apiRequest<{ company_id: string; company_slug: string; quotas: SystemCompanyQuotas }>(
+    `/system/companies/${companyId}/quotas/`
+  );
+}
+
+export async function systemUpdateCompanyQuotas(companyId: string, updates: Partial<SystemCompanyQuotas>) {
+  return apiRequest<{ company_id: string; company_slug: string; quotas: SystemCompanyQuotas }>(
+    `/system/companies/${companyId}/quotas/`,
+    { method: "PATCH", body: updates as Record<string, unknown> }
+  );
+}
+
+export async function systemUpdateCompanyStatus(companyId: string, is_active: boolean) {
+  return apiRequest<{ company_id: string; company_slug: string; is_active: boolean }>(
+    `/system/companies/${companyId}/status/`,
+    { method: "PATCH", body: { is_active } }
+  );
+}
+
+export async function systemFetchUsers() {
+  const payload = await apiRequest<SystemUser[] | PaginatedResponse<SystemUser>>("/system/users/");
+  return normalizeListResponse(payload);
+}
+
+export async function systemCreateUser(payload: SystemUserCreateInput) {
+  return apiRequest<SystemUserDetail>("/system/users/", {
+    method: "POST",
+    body: payload as Record<string, unknown>,
+  });
+}
+
+export async function systemFetchUser(userId: string) {
+  return apiRequest<SystemUserDetail>(`/system/users/${userId}/`);
+}
+
+export async function systemUpdateUser(userId: string, updates: SystemUserUpdateInput) {
+  return apiRequest<SystemUserDetail>(`/system/users/${userId}/`, {
+    method: "PATCH",
+    body: updates as Record<string, unknown>,
+  });
+}
+
+export async function systemResetUserPassword(userId: string, newPassword: string) {
+  return apiRequest<{ user_id: string; user_email: string; password_reset: boolean }>(
+    `/system/users/${userId}/reset-password/`,
+    {
+      method: "POST",
+      body: { new_password: newPassword },
+    }
+  );
+}
+
+export async function systemDeactivateUser(userId: string) {
+  return apiRequest<void>(`/system/users/${userId}/`, {
+    method: "DELETE",
+    body: {},
+  });
+}
+
+export async function systemUpdateUserRole(
+  userId: string,
+  updates: { role?: string | null; is_active?: boolean }
+) {
+  return apiRequest<{ user_id: string; user_email: string; system_role: { role: SystemRole; is_active: boolean } | null }>(
+    `/system/users/${userId}/system-role/`,
+    { method: "PATCH", body: updates as Record<string, unknown> }
+  );
+}
+
+export async function systemUpsertCompanyMember(
+  companyId: string,
+  payload: { user_id: string; status?: string; roles?: string[] }
+) {
+  return apiRequest<SystemCompanyMember>(`/system/companies/${companyId}/members/`, {
+    method: "POST",
+    body: payload as Record<string, unknown>,
+  });
+}
+
+export async function systemReplaceCompanyMemberRoles(companyId: string, userId: string, roles: string[]) {
+  return apiRequest<{ company_id: string; user_id: string; roles: string[] }>(
+    `/system/companies/${companyId}/members/${userId}/roles/`,
+    {
+      method: "PATCH",
+      body: { roles },
+    }
+  );
+}
+
+export async function systemRemoveCompanyMember(companyId: string, userId: string) {
+  return apiRequest<void>(`/system/companies/${companyId}/members/${userId}/`, {
+    method: "DELETE",
+    body: {},
+  });
+}
+
+export async function systemFetchAuditLogs(filters: {
+  action?: string;
+  resource_type?: string;
+  actor_id?: string;
+  date_from?: string;
+  date_to?: string;
+} = {}) {
+  const payload = await apiRequest<SystemAuditLog[] | PaginatedResponse<SystemAuditLog>>(
+    withQuery("/system/audit-logs/", {
+      action: filters.action,
+      resource_type: filters.resource_type,
+      actor_id: filters.actor_id,
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+    })
+  );
+  return normalizeListResponse(payload);
+}
+
+export async function systemFetchGlobalFeatureFlags() {
+  return apiRequest<SystemGlobalFeatureFlags>("/system/feature-flags/");
+}
+
+export async function systemHealthCheck() {
+  return apiRequest<{ status: string }>("/system/health/");
+}

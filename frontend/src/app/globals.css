@@ -143,3 +143,28 @@
   scrollbar-width: thin;
   scrollbar-color: oklch(0.3 0.02 258) transparent;
 }
+
+/* Public site theme tokens (scoped usage via .public-site) */
+:root {
+  --public-bg: #f7fafc;
+  --public-surface: #ffffff;
+  --public-surface-alt: #eef4ff;
+  --public-text: #0f172a;
+  --public-text-muted: #475569;
+  --public-border: #dce5f1;
+  --public-primary: #2563eb;
+  --public-primary-hover: #1d4ed8;
+  --public-primary-soft: #dbeafe;
+  --public-success: #16a34a;
+  --public-warning: #d97706;
+  --public-danger: #dc2626;
+  --public-hero-gradient: linear-gradient(135deg, #eff6ff 0%, #f8fafc 45%, #e0ecff 100%);
+  --public-cta-gradient: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  --public-footer-bg: #0f172a;
+  --public-footer-text: #e2e8f0;
+  --public-footer-text-muted: #94a3b8;
+}
+
+.public-site {
+  font-family: var(--font-public-body), var(--font-geist-sans), sans-serif;
+}

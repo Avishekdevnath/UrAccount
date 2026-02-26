@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2 } from "lucide-react";
 
-import { ApiError, fetchCompanies, login } from "@/lib/api-client";
+import { ApiError, fetchCompanies, fetchMe, login } from "@/lib/api-client";
 import { setTokens } from "@/lib/auth-storage";
 import { getFirstCompanyDashboardPath } from "@/lib/company-routing";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,19 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const DEMO_PASSWORD = "Demo@12345";
-const DEMO_USERS = [
+const SHOW_SYSTEM_ADMIN_DEMO = process.env.NEXT_PUBLIC_SHOW_SYSTEM_ADMIN_DEMO === "1";
+const SHOW_SYSTEM_ADMIN_UI = process.env.NEXT_PUBLIC_SYSTEM_ADMIN_UI === "1";
+
+const BASE_DEMO_USERS = [
   { role: "Owner", email: "owner@demo.local" },
   { role: "Admin", email: "admin@demo.local" },
   { role: "Accountant", email: "accountant@demo.local" },
   { role: "Viewer", email: "viewer@demo.local" },
 ];
+
+const DEMO_USERS = SHOW_SYSTEM_ADMIN_DEMO && SHOW_SYSTEM_ADMIN_UI
+  ? [...BASE_DEMO_USERS, { role: "System Admin", email: "sysadmin@demo.local" }]
+  : BASE_DEMO_USERS;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,7 +43,11 @@ export default function LoginPage() {
     try {
       const tokens = await login(email, password);
       setTokens(tokens.access, tokens.refresh);
-      const companies = await fetchCompanies();
+      const [me, companies] = await Promise.all([fetchMe(), fetchCompanies()]);
+      if (SHOW_SYSTEM_ADMIN_UI && me.system_role && me.system_role_active) {
+        router.replace("/system");
+        return;
+      }
       const nextPath = getFirstCompanyDashboardPath(companies) ?? "/app";
       router.replace(nextPath);
     } catch (error) {
@@ -56,7 +68,7 @@ export default function LoginPage() {
         className="hidden lg:flex lg:w-[420px] flex-col justify-between p-10 shrink-0"
         style={{ background: "var(--sidebar)" }}
       >
-        <div className="flex items-center gap-2.5">
+        <Link href="/" className="inline-flex items-center gap-2.5 no-underline hover:no-underline">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
@@ -66,7 +78,7 @@ export default function LoginPage() {
           >
             UrAccount
           </span>
-        </div>
+        </Link>
 
         <div>
           <blockquote
@@ -89,12 +101,12 @@ export default function LoginPage() {
       {/* Right panel — form */}
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-12">
         {/* Mobile logo */}
-        <div className="flex items-center gap-2 mb-8 lg:hidden">
+        <Link href="/" className="mb-8 inline-flex items-center gap-2 no-underline hover:no-underline lg:hidden">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="text-lg font-semibold tracking-tight">UrAccount</span>
-        </div>
+        </Link>
 
         <div className="w-full max-w-sm">
           <div className="mb-8">
